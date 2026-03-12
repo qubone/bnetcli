@@ -1,6 +1,6 @@
 [project]
 name = "bnetcli"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Standalone battle.net launcher for Linux-based systems."
 readme = "README.md"
 authors = [
