@@ -1,0 +1,65 @@
+[project]
+name = "bnetcli"
+version = "0.1.0"
+description = "Standalone battle.net launcher for Linux-based systems."
+readme = "README.md"
+authors = [
+    { name = "qubone", email = "linussbo@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "click>=8.3.1",
+    "protonup>=0.1.5",
+    "pyyaml>=6.0.3",
+    "requests>=2.32.5",
+]
+
+[project.scripts]
+bnetcli = "bnetcli.cli:cli"
+
+[project.optional-dependencies]
+lint = ["ruff"]
+typecheck = ["ty"]
+test = ["pytest", "pytest-cov"]
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 119
+
+[tool.ruff.lint]
+select = [
+    "F",  # Pyflakes
+    "E",  # PEP 8
+    "W",  # PEP 8 warnings
+    "C",  # Complexity
+    "N",  # Naming conventions
+    "T",  # Type hints
+    "I",  # Import formatting
+    "B",  # Bug patterns
+    "UP", # Upgrade checks
+    "C4", #
+    "G",  #
+    "D",  # Docstring conventions
+]
+
+# Per-file ignores for tests (docstrings and common test-only rules)
+per-file-ignores = {"tests/**" = ["D100", "D103"]}
+
+[tool.uv.sources]
+q-python-ci-generator = { git = "https://github.com/qubone/q-python-ci-generator.git", rev = "main" }
+
+
+[dependency-groups]
+ci = [
+    "q-python-ci-generator",
+]
+dev = [
+    "ruff>=0.15.4",
+]
+
+ 
