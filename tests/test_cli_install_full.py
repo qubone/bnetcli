@@ -22,7 +22,7 @@ def test_install_non_dry_run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
     monkeypatch.setattr("bnetcli.config.load_config", lambda path=None: cfg)
 
     # Ensure proton exe exists
-    proton_exe = Path(cfg["proton_path"]) / "GE-Proton10-24" / "proton"
+    proton_exe = Path(str(cfg["proton_path"])) / "GE-Proton10-24" / "proton"
     proton_exe.parent.mkdir(parents=True)
     proton_exe.write_text("")
 

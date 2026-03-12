@@ -74,6 +74,7 @@ def resolve_proton_version(
     """Resolve which Proton version to use.Returns (version_string, proton_executable_path)."""
     proton_dir = proton_dir.expanduser()
 
+    version: str | None
     if requested_version and requested_version != "auto":
         logger.info("Using user requested Proton version: %s", requested_version)
         version = requested_version
