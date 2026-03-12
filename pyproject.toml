@@ -19,7 +19,7 @@ bnetcli = "bnetcli.cli:cli"
 
 [project.optional-dependencies]
 lint = ["ruff"]
-typecheck = ["ty"]
+typecheck = ["mypy", "ty"]
 test = ["pytest", "pytest-cov"]
 [build-system]
 requires = ["setuptools>=61"]
