@@ -1,0 +1,23 @@
+name: CI
+
+description: Continuous Integration Workflow for bnetcli module
+
+permissions:
+  contents: write
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  ci:
+    uses: qubone/q-python-ci-actions/.github/workflows/python-ci.yml@main
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+    with:
+      python-version: 3.12
+
+      coverage-threshold: 80
