@@ -34,6 +34,26 @@ def remove(version: str) -> None:
     run(["protonup", "-r", version])
 
 
+def remove_installed_versions(proton_dir: Path) -> list[Path]:
+    """Remove installed Proton GE versions from the target compatibility directory.
+
+    Only removes directories matching GE-Proton* to avoid removing unrelated files.
+    """
+    from shutil import rmtree
+
+    removed: list[Path] = []
+    proton_dir = proton_dir.expanduser()
+    if not proton_dir.exists():
+        return removed
+
+    for entry in proton_dir.iterdir():
+        if entry.is_dir() and entry.name.startswith("GE-Proton"):
+            logger.info("Removing Proton version directory: %s", entry)
+            rmtree(entry, ignore_errors=True)
+            removed.append(entry)
+    return removed
+
+
 def get_proton_executable(proton_path: Path, version: str) -> Path:
     """Get the path to the Proton executable for a given version."""
     return proton_path.expanduser() / version / "proton"
