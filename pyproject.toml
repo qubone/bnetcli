@@ -33,6 +33,13 @@ where = ["src"]
 [tool.setuptools.package-data]
 bnetcli = ["py.typed"]
 
+[tool.mypy]
+strict=true
+#TODO: Investigate explicit_package_bases = true
+#TODO: Investigate packages = ["qsleeperfantasybot", "test"]
+ignore_missing_imports = true
+disallow_untyped_decorators = false
+
 
 [tool.ruff]
 line-length = 119
