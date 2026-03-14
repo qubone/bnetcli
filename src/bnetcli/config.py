@@ -68,8 +68,24 @@ def load_config(config_file: Path | None = None) -> dict:
             yaml.dump(DEFAULT_CONFIG, f)
         return DEFAULT_CONFIG
 
-    with path.open() as f:
-        return yaml.safe_load(f)
+    try:
+        with path.open() as f:
+            cfg = yaml.safe_load(f)
+    except yaml.YAMLError:
+        logger.warning("Corrupt config file at %s, recreating default config.", path)
+        with path.open("w") as f:
+            yaml.dump(DEFAULT_CONFIG, f)
+        return DEFAULT_CONFIG
+
+    if cfg is None:
+        logger.warning("Empty config file at %s, recreating default config.", path)
+        with path.open("w") as f:
+            yaml.dump(DEFAULT_CONFIG, f)
+        return DEFAULT_CONFIG
+
+    defaults = DEFAULT_CONFIG.copy()
+    defaults.update(cfg)
+    return defaults
 
 
 ## Auto helper functions
