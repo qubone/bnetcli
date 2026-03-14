@@ -107,10 +107,12 @@ def start(proton_version: str, config_file: Path | None):
     if not compat_dir.exists():
         raise click.ClickException("Proton compatibility tools directory not found")
 
-    if not proton_version:
-        latest_proton_version = detect_latest_proton(compat_dir)
-        if not latest_proton_version:
-            raise click.ClickException("No Proton version detected")
+    if proton_version == "auto":
+        detected_proton_version = detect_latest_proton(compat_dir)
+        if detected_proton_version:
+            proton_version = detected_proton_version
+        else:
+            click.secho("No Proton version detected; using default configured version.", fg="yellow")
 
     click.echo(f"Using Proton version: {proton_version}")
 
@@ -118,7 +120,10 @@ def start(proton_version: str, config_file: Path | None):
     logger.debug("Looking for Proton executable at: %s", proton_exe)
 
     if not proton_exe.exists():
-        raise click.ClickException("Proton executable not found")
+        click.secho(
+            f"Proton executable not found at: {proton_exe}. Continuing to attempt launch, but this may fail.",
+            fg="yellow",
+        )
 
     env = os.environ.copy()
     env.update(cfg["environment"])
@@ -126,11 +131,13 @@ def start(proton_version: str, config_file: Path | None):
     env["STEAM_COMPAT_CLIENT_INSTALL_PATH"] = str(steam_path)
 
     click.echo(f"→ {proton_exe} run {launcher_exe}")
-
-    utils.run(
-        [str(proton_exe), "run", str(launcher_exe)],
-        env=env,
-    )
+    try:
+        utils.run(
+            [str(proton_exe), "run", str(launcher_exe)],
+            env=env,
+        )
+    except FileNotFoundError as exc:
+        raise click.ClickException(f"Failed to launch Battle.net: {exc}") from exc
 
 
 @cli.command()
