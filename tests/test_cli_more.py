@@ -80,5 +80,5 @@ def test_start_expands_paths_and_sets_env(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert result.exit_code == 0
     assert captured["cmd"][0].endswith("proton")
     assert captured["env"]["STEAM_COMPAT_DATA_PATH"] == str(Path("~/Games/battlenet/pfx").expanduser())
-    assert captured["env"]["STEAM_COMPAT_CLIENT_INSTALL_PATH"] == str((Path.home() / ".local/share/Steam"))
+    assert captured["env"]["STEAM_COMPAT_CLIENT_INSTALL_PATH"] == str(Path.home() / ".local/share/Steam")
     assert captured["env"]["WINEPREFIX"] == str(Path("~/Games/battlenet/pfx").expanduser())
