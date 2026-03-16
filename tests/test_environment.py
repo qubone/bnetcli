@@ -24,5 +24,7 @@ def test_prepare_environment(tmp_path: Path) -> None:
 
     prepared: dict[str, Any] = environment.prepare_environment(prefix, env)
     assert prepared.get("WINEPREFIX") == str(prefix)
+    assert prepared.get("STEAM_COMPAT_DATA_PATH") == str(prefix)
+    assert prepared.get("STEAM_COMPAT_CLIENT_INSTALL_PATH") == str(Path.home() / ".local/share/Steam")
     assert prepared.get("FOO") == "bar"
     assert "VK_ICD_FILENAMES" in prepared

@@ -7,6 +7,7 @@ import click
 
 from . import config, installer, proton, repair, system, utils, wine
 from .doctor import run_diagnostics
+from .game_info import GameInfo, find_installed_blizzard_games
 from .proton import detect_latest_proton, detect_steam_base_path, ensure_compat_dir
 
 logger = logging.getLogger(__name__)
@@ -74,12 +75,21 @@ def install(proton_version: str, dry_run: bool, config_file: Path | None):
         click.secho(f"Would download installer to: {installer_path}", fg="cyan")
 
     if not dry_run:
-        installer.launch_installer(
-            proton_exe,
-            installer_path,
-            prefix,
-            cfg.get("environment", {}),
+        env_vars = cfg.get("environment", {}).copy()
+        env_vars.setdefault("STEAM_COMPAT_DATA_PATH", str(prefix))
+        env_vars.setdefault(
+            "STEAM_COMPAT_CLIENT_INSTALL_PATH",
+             str(Path(cfg.get("steam_path", "~/.local/share/Steam")).expanduser())
         )
+        try:
+            installer.launch_installer(
+                proton_exe,
+                installer_path,
+                prefix,
+                env_vars,
+            )
+        except RuntimeError as exc:
+            raise click.ClickException(f"Environment validation failed during install: {exc}") from exc
     else:
         click.secho(
             f"Would launch installer with: {proton_exe} run {installer_path} using prefix {prefix}",
@@ -153,21 +163,46 @@ def uninstall(config_file: Path | None):
     )
 
 
+def _build_start_env(prefix: Path, steam_path: Path, cfg: dict) -> dict[str, str]:
+    env = os.environ.copy()
+    env.update(cfg.get("environment", {}))
+    env["STEAM_COMPAT_DATA_PATH"] = str(prefix)
+    env["STEAM_COMPAT_CLIENT_INSTALL_PATH"] = str(steam_path)
+    env["WINEDEBUG"] = "-all"
+    env["PROTON_NO_ESYNC"] = "1"
+    env["PROTON_NO_FSYNC"] = "1"
+    env["WINEPREFIX"] = str(prefix)
+    return env
+
+
+def _get_proton_exe_path(cfg: dict, proton_version: str) -> Path:
+    return Path(cfg["proton_path"]).expanduser() / proton_version / "proton"
+
+
+def _ensure_required_env(env: dict[str, str]) -> None:
+    required_env = ["WINEPREFIX", "STEAM_COMPAT_DATA_PATH", "STEAM_COMPAT_CLIENT_INSTALL_PATH"]
+    missing_env = [k for k in required_env if not env.get(k)]
+    if missing_env:
+        raise click.ClickException(
+            f"Missing required environment for Proton: {', '.join(missing_env)}"
+        )
+
+
 @cli.command()
 @click.option("--disable-browser/--enable-browser", default=True, help="Disable Battle.net embedded browser.")
 @click.option("--start-minimized/--normal", default=False, help="Start Battle.net minimized.")
-@click.option("--proton-version", default="GE-Proton10-24", help="Proton version to use")
+@click.option("--proton-version", default="GE-Proton10-32", help="Proton version to use")
 @click.option("--config-file", type=click.Path(exists=False), help="Optional path to config file")
 def start(disable_browser: bool, start_minimized: bool, proton_version: str, config_file: Path | None):
     """Start the Battle.net launcher using the optionally specified Proton version."""
     cfg = config.load_config(config_file)
 
-    prefix = Path(cfg["wine_prefix"])
-    launcher_exe = Path(cfg["executable"])
+    prefix = Path(cfg["wine_prefix"]).expanduser()
+    launcher_exe = Path(cfg["executable"]).expanduser()
 
-    steam_path = detect_steam_base_path()
-    if not steam_path:
-        click.secho("Steam installation not detected. Please specify the path in the config file.", fg="red")
+    steam_path = detect_steam_base_path() or Path(cfg.get("steam_path", "~/.local/share/Steam")).expanduser()
+    if not steam_path.exists():
+        click.secho("Steam installation not detected; using default location for compatibility tools.", fg="yellow")
 
     compat_dir = ensure_compat_dir(steam_path)
     if not compat_dir.exists():
@@ -182,51 +217,55 @@ def start(disable_browser: bool, start_minimized: bool, proton_version: str, con
 
     click.echo(f"Using Proton version: {proton_version}")
 
-    proton_exe = Path(cfg["proton_path"]) / proton_version / "proton"
+    proton_exe = _get_proton_exe_path(cfg, proton_version)
     logger.debug("Looking for Proton executable at: %s", proton_exe)
-
     if not proton_exe.exists():
         click.secho(
             f"Proton executable not found at: {proton_exe}. Continuing to attempt launch, but this may fail.",
             fg="yellow",
         )
 
-    env = os.environ.copy()
-    env.update(cfg.get("environment", {}))
-    env["STEAM_COMPAT_DATA_PATH"] = str(prefix)
-    env["STEAM_COMPAT_CLIENT_INSTALL_PATH"] = str(steam_path)
+    env = _build_start_env(prefix, steam_path, cfg)
+    _ensure_required_env(env)
+
+    if not prefix.exists():
+        click.secho(f"Wine prefix does not exist: {prefix}. Proton may create it when launching.", fg="yellow")
 
     click.echo(f"→ {proton_exe} run {launcher_exe}")
 
-
-
     cmd = [str(proton_exe), "run", str(launcher_exe)]
     if disable_browser:
-        # These are ENV VARS for Proton/Wine
         env["PROTON_NO_ESYNC"] = "1"
         env["PROTON_NO_FSYNC"] = "1"
-        # These are CLI FLAGS for the Battle.net EXE to stabilize the browser
-
-        # Fix Agent went to sleep error
         env["WINE_SIMULATE_WRITECOPY"] = "1"
-
         cmd.extend(["--no-sandbox", "--disable-gpu"])
         click.secho("Applying browser stability fixes (esync/fsync off + no-sandbox)", fg="yellow")
     if start_minimized:
-        # This MUST be a CLI flag, not an environment variable
         cmd.append("--autostarted")
         click.secho("Starting Battle.net with --autostarted flag", fg="yellow")
 
-
-
     try:
-        utils.run(
-            [str(proton_exe), "run", str(launcher_exe)],
-            env=env,
-        )
+        utils.run(cmd, env=env)
     except FileNotFoundError as exc:
         raise click.ClickException(f"Failed to launch Battle.net: {exc}") from exc
 
+
+@cli.command()
+@click.option("--config-file", type=click.Path(exists=False), help="Optional path to config file")
+def list_games(config_file: Path | None):
+    """List Blizzard games installed in the configured Wine prefix drive_c."""
+    cfg = config.load_config(config_file)
+    prefix = Path(cfg["wine_prefix"]).expanduser()
+
+    games: dict[str, GameInfo] = find_installed_blizzard_games(prefix)
+    if not games:
+        click.secho("No Blizzard games found in prefix drive_c. \
+        Ensure games are installed in your Battle.net prefix.", fg="yellow")
+        return
+
+    click.secho("Installed Blizzard games:", fg="green")
+    for game_info in sorted(games.values(), key=lambda g: g.name):
+        click.echo(f"- {game_info}")
 
 @cli.command()
 def doctor():

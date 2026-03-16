@@ -31,4 +31,5 @@ def download(dest: Path) -> None:
 def launch_installer(proton: Path, installer: Path, prefix: Path, env_vars: dict):
     """Launch the Battle.net installer using the specified Proton executable and Wine prefix."""
     logger.info("Launching installer %s in prefix %s", installer, prefix)
-    utils.run([str(proton), "run", str(installer)], env=prepare_environment(prefix, env_vars))
+    env = prepare_environment(prefix, env_vars)
+    utils.run([str(proton), "run", str(installer)], env=env)
