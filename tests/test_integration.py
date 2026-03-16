@@ -19,9 +19,9 @@ def test_integration_cli_dry_run_install_and_start(monkeypatch: pytest.MonkeyPat
     }
 
     monkeypatch.setattr("bnetcli.config.load_config", lambda p=None: cfg)
-    monkeypatch.setattr("bnetcli.proton.ensure_compat_dir", lambda p: Path(cfg["proton_path"]))
+    monkeypatch.setattr("bnetcli.proton.ensure_compat_dir", lambda p: Path(cfg["proton_path"]))  # type: ignore[arg-type]
     def fake_resolve_proton_version(d, v):
-        return "GE-Proton10-24", Path(cfg["proton_path"]) / "GE-Proton10-24" / "proton"
+        return "GE-Proton10-24", Path(cfg["proton_path"]) / "GE-Proton10-24" / "proton"  # ty:ignore[invalid-argument-type]
 
     monkeypatch.setattr("bnetcli.proton.resolve_proton_version", fake_resolve_proton_version)
     monkeypatch.setattr("bnetcli.wine.create_prefix", lambda prefix, proton: prefix.mkdir(parents=True, exist_ok=True))
