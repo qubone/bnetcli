@@ -73,7 +73,7 @@ def check_basic_dependencies() -> list[str]:
     return missing
 
 
-def print_system_summary():
+def print_system_summary() -> None:
     """Print system info."""
     logger.info("System diagnostics")
     logger.info("------------------")

@@ -64,6 +64,51 @@ Behavior:
 ### `bnetcli doctor`
 Run system diagnostics.
 
+## Troubleshooting
+
+### 1) Ensure paths are expanded and absolute
+In config, `~` values are now supported, but the launcher expects valid paths. Example:
+
+```yaml
+wine_prefix: "~/Games/battlenet/pfx"
+executable: "~/Games/battlenet/pfx/drive_c/Program Files (x86)/Battle.net/Battle.net Launcher.exe"
+proton_path: "~/.local/share/Steam/compatibilitytools.d"
+```
+
+### 2) Install `protonup` for Proton auto-management
+System checks require `protonup`. On Arch:
+
+```bash
+sudo pacman -S protonup
+```
+
+or with pip:
+
+```bash
+pip install protonup
+```
+
+Then run:
+
+```bash
+bnetcli install --dry-run
+```
+
+### 3) Common runtime failure
+If Proton returns non-zero, verify:
+- steam is installed and path exists
+- configured `wine_prefix` contains valid Battle.net prefix
+- Battle.net executable exists in the prefix path
+
+### 4) Useful commands
+
+```bash
+bnetcli doctor
+bnetcli install --dry-run
+bnetcli install
+bnetcli start
+```
+
 ### Example uninstall
 
 ```bash
@@ -72,3 +117,7 @@ bnetcli uninstall
 
 This will remove your configured Wine prefix and installer file. It prompts to optionally clean Proton directories.
 
+### Games ###
+
+World of Warcraft default installation path:
+C:\Program Files (x86)\World of Warcraft

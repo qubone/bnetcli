@@ -9,8 +9,8 @@ logger = getLogger(__name__)
 
 # TODO: Add more STEAM RUNTIME ENVVARS
 DEFAULT_CONFIG = {
-    "wine_prefix": "/home/qubone/Games/battlenet",
-    "executable": "/home/qubone/Games/battlenet/drive_c/Program Files (x86)/Battle.net/Battle.net Launcher.exe",
+    "wine_prefix": "/home/qubone/Games/battlenet/pfx",
+    "executable": "/home/qubone/Games/battlenet/pfx/drive_c/Program Files (x86)/Battle.net/Battle.net Launcher.exe",
     "proton_path": "/home/qubone/.local/share/Steam/compatibilitytools.d",
     "proton_version": "GE-Proton10-24",
     "installer_path": "/home/qubone/Downloads/Battle.net-Setup.exe",
@@ -58,9 +58,9 @@ class BnetConfig:
     environment: dict[str, str] = field(default_factory=dict)
 
 
-def load_config(config_file: Path | None = None) -> dict:
+def load_config(config_file: Path | str | None = None) -> dict:
     """Load configuration from the specified file or create a default config if the file does not exist."""
-    path = config_file if config_file is not None else CONFIG_FILE_PATH
+    path = Path(config_file) if config_file is not None else CONFIG_FILE_PATH
     if not path.exists():
         logger.info("Config file not found at %s, creating default config.", path)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -68,8 +68,24 @@ def load_config(config_file: Path | None = None) -> dict:
             yaml.dump(DEFAULT_CONFIG, f)
         return DEFAULT_CONFIG
 
-    with path.open() as f:
-        return yaml.safe_load(f)
+    try:
+        with path.open() as f:
+            cfg = yaml.safe_load(f)
+    except yaml.YAMLError:
+        logger.warning("Corrupt config file at %s, recreating default config.", path)
+        with path.open("w") as f:
+            yaml.dump(DEFAULT_CONFIG, f)
+        return DEFAULT_CONFIG
+
+    if cfg is None:
+        logger.warning("Empty config file at %s, recreating default config.", path)
+        with path.open("w") as f:
+            yaml.dump(DEFAULT_CONFIG, f)
+        return DEFAULT_CONFIG
+
+    defaults = DEFAULT_CONFIG.copy()
+    defaults.update(cfg)
+    return defaults
 
 
 ## Auto helper functions
@@ -112,7 +128,7 @@ def default_paths():
     steam = detect_steam_path() or HOME_DIR/ ".local/share/Steam"
     proton = detect_proton_path() or steam / "compatibilitytools.d"
 
-    prefix = HOME_DIR / "Games/battlenet"
+    prefix = HOME_DIR / "Games/battlenet/pfx"
 
     return {
         "steam_path": steam,

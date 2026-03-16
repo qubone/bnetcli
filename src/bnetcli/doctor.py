@@ -195,7 +195,9 @@ def run_diagnostics():
 
     if battlenet_exe.exists():
         click.secho("Battle.net executable found", fg="green")
+        click.secho(f"Executable path: {battlenet_exe}", fg="green")
     else:
         click.secho("Battle.net executable NOT found", fg="yellow")
+        click.secho(f"Expected path: {battlenet_exe}", fg="yellow")
 
     click.echo("\n=== Diagnostics Complete ===")

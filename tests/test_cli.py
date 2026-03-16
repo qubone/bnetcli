@@ -96,3 +96,55 @@ def test_uninstall_then_install_behaves_like_fresh(monkeypatch: pytest.MonkeyPat
     result_install = runner.invoke(cli.cli, ["install", "--dry-run"])
     assert result_install.exit_code == 0
     assert prefix.exists()
+
+
+def test_list_games_detects_installed_games(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    runner = CliRunner()
+    prefix = tmp_path / "bnet_prefix"
+    (prefix / "drive_c" / "Program Files (x86)" / "World of Warcraft").mkdir(parents=True)
+    (prefix / "drive_c" / "Program Files (x86)" / "Diablo IV").mkdir(parents=True)
+
+    cfg = {
+        "wine_prefix": str(prefix),
+        "executable": str(prefix / "drive_c" / "Program Files (x86)" / "Battle.net" / "Battle.net Launcher.exe"),
+        "proton_path": str(tmp_path / "compat"),
+    }
+    monkeypatch.setattr("bnetcli.config.load_config", lambda p=None: cfg)
+
+    result = runner.invoke(cli.cli, ["list-games"])
+    assert result.exit_code == 0
+    assert "World of Warcraft" in result.output
+    assert "Diablo IV" in result.output
+
+
+def test_game_info_pretty_bytes_and_str(tmp_path: Path) -> None:
+    game_dir = tmp_path / "World of Warcraft"
+    game_dir.mkdir(parents=True)
+    # Create some files with known sizes
+    (game_dir / "a.bin").write_bytes(b"x" * 1536)
+    (game_dir / "b.bin").write_bytes(b"x" * 2048)
+
+    info = cli.GameInfo.from_detected_path("World of Warcraft", game_dir)
+    assert info.name == "World of Warcraft"
+    assert info.path == game_dir
+    assert info.file_count == 2
+    assert info.disk_usage_bytes == 3584
+    assert info.pretty_bytes().endswith("KB")
+    assert "World of Warcraft" in str(info)
+    assert "files" in str(info)
+
+
+def test_find_installed_blizzard_games_returns_game_info(tmp_path: Path) -> None:
+    prefix = tmp_path / "bnet_prefix"
+    game_path = prefix / "drive_c" / "Program Files (x86)" / "Diablo IV"
+    game_path.mkdir(parents=True)
+    (game_path / "game.exe").write_bytes(b"x")
+
+    found = cli.find_installed_blizzard_games(prefix)
+    assert "Diablo IV" in found
+    info = found["Diablo IV"]
+    assert isinstance(info, cli.GameInfo)
+    assert info.name == "Diablo IV"
+    assert info.path == game_path
+    assert info.file_count == 1
+
