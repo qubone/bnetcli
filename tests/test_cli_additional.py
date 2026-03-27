@@ -1,16 +1,18 @@
 from click.testing import CliRunner
 
 from bnetcli import cli
+from bnetcli.config import BnetConfig, EnvironmentConfig
 
 
 def test_start_when_proton_missing(monkeypatch, tmp_path):
     runner = CliRunner()
-
-    cfg = {
-        "wine_prefix": str(tmp_path / "prefix"),
-        "executable": str(tmp_path / "launcher.exe"),
-        "proton_path": str(tmp_path / "compat")
-    }
+    cfg = BnetConfig(
+        wine_prefix=tmp_path / "prefix",
+        executable=tmp_path / "launcher.exe",
+        proton_path=tmp_path / "compat",
+        steam_path=tmp_path / "steam",
+        environment=EnvironmentConfig(),  # or with defaults
+    )
 
     monkeypatch.setattr("bnetcli.config.load_config", lambda p=None: cfg)
     monkeypatch.setattr("bnetcli.proton.detect_steam_base_path", lambda: tmp_path / "steam")

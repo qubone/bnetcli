@@ -10,7 +10,7 @@ def test_load_config_auto_creates(monkeypatch, tmp_path):
     if (tmp_path / "cfg.yml").exists():
         (tmp_path / "cfg.yml").unlink()
 
-    bcfg = config.load_config_auto()
+    bcfg = config.BnetConfig.resolve(config.load_config())
     assert bcfg is not None
     assert hasattr(bcfg, "wine_prefix")
 

@@ -8,6 +8,7 @@ import click
 from . import config, installer, proton, repair, system, utils, wine
 from .doctor import run_diagnostics
 from .game_info import GameInfo, find_installed_blizzard_games
+from .paths import CONFIG_FILE_PATH
 from .proton import detect_latest_proton, detect_steam_base_path, ensure_compat_dir
 
 logger = logging.getLogger(__name__)
@@ -34,7 +35,10 @@ def repair_prefix(config_file: Path | None):
     """Repair Battle.net Wine prefix."""
     cfg = config.load_config(config_file)
 
-    prefix = Path(cfg["wine_prefix"]).expanduser()
+    prefix = cfg.wine_prefix
+    if prefix is None:
+        click.secho("Wine prefix path is not configured. Please set 'wine_prefix' in your config file.", fg="red")
+        return
     click.secho(f"Repairing Battle.net prefix at: {prefix}", fg="yellow")
     repair.repair_prefix(prefix)
 
@@ -52,8 +56,8 @@ def install(proton_version: str, dry_run: bool, config_file: Path | None):
     cfg = config.load_config(config_file)
 
     configured_path = (
-        Path(cfg["proton_path"]).expanduser()
-        if cfg.get("proton_path")
+        cfg.proton_path
+        if cfg.proton_path
         else None
     )
 
@@ -64,22 +68,32 @@ def install(proton_version: str, dry_run: bool, config_file: Path | None):
         proton_version
     )
     click.secho(f"Using Proton version: {version}", fg="cyan")
-    prefix = Path(cfg["wine_prefix"]).expanduser()
+    prefix = cfg.wine_prefix
+
+    if prefix is None:
+        click.secho("Wine prefix path is not configured. Please set 'wine_prefix' in your config file.", fg="red")
+        return
 
     wine.create_prefix(prefix, proton_exe)
 
-    installer_path = Path(cfg["installer_path"]).expanduser()
+    installer_path = cfg.installer_path
+    if installer_path is None:
+        click.secho("No installer path configured; using default.", fg="yellow")
+        installer_path = config.battlenet_installer_path()
     if not dry_run:
         installer.download(installer_path)
     else:
         click.secho(f"Would download installer to: {installer_path}", fg="cyan")
 
     if not dry_run:
-        env_vars = cfg.get("environment", {}).copy()
+        env_vars = cfg.environment.model_dump()
         env_vars.setdefault("STEAM_COMPAT_DATA_PATH", str(prefix))
+        if not cfg.steam_path:
+            raise click.ClickException("steam_path is not configured")
+
         env_vars.setdefault(
             "STEAM_COMPAT_CLIENT_INSTALL_PATH",
-             str(Path(cfg.get("steam_path", "~/.local/share/Steam")).expanduser())
+            str(cfg.steam_path)
         )
         try:
             installer.launch_installer(
@@ -95,7 +109,7 @@ def install(proton_version: str, dry_run: bool, config_file: Path | None):
             f"Would launch installer with: {proton_exe} run {installer_path} using prefix {prefix}",
             fg="cyan"
         )
-        click.secho(f"Environment variables: {cfg.get('environment', {})}", fg="cyan")
+        click.secho(f"Environment variables: {cfg.environment.model_dump()}", fg="cyan")
     click.secho("Installation complete! You can run 'bnetcli start' to launch Battle.net.", fg="green", bold=True)
 
 
@@ -128,15 +142,19 @@ def _uninstall_proton_versions(proton_path: Path) -> list[Path]:
 def uninstall(config_file: Path | None):
     """Uninstall Battle.net installation and optionally Proton."""
     cfg = config.load_config(config_file)
-    prefix = Path(cfg["wine_prefix"]).expanduser()
+    prefix = cfg.wine_prefix
+    if prefix is None:
+        click.secho("Wine prefix path is not configured. Please set 'wine_prefix' in your config file.", fg="red")
+        return
+
     installer_path = (
-        Path(cfg["installer_path"]).expanduser()
-        if cfg.get("installer_path")
+        cfg.installer_path
+        if cfg.installer_path
         else None
     )
     proton_path = (
-        Path(cfg["proton_path"]).expanduser()
-        if cfg.get("proton_path")
+        cfg.proton_path
+        if cfg.proton_path
         else None
     )
 
@@ -163,9 +181,10 @@ def uninstall(config_file: Path | None):
     )
 
 
-def _build_start_env(prefix: Path, steam_path: Path, cfg: dict) -> dict[str, str]:
+def _build_start_env(prefix: Path, steam_path: Path, cfg: config.BnetConfig) -> dict[str, str]:
+    """Build environment variables for starting Battle.net with Proton."""
     env = os.environ.copy()
-    env.update(cfg.get("environment", {}))
+    env.update(cfg.environment)
     env["STEAM_COMPAT_DATA_PATH"] = str(prefix)
     env["STEAM_COMPAT_CLIENT_INSTALL_PATH"] = str(steam_path)
     env["WINEDEBUG"] = "-all"
@@ -175,11 +194,22 @@ def _build_start_env(prefix: Path, steam_path: Path, cfg: dict) -> dict[str, str
     return env
 
 
-def _get_proton_exe_path(cfg: dict, proton_version: str) -> Path:
-    return Path(cfg["proton_path"]).expanduser() / proton_version / "proton"
+def _get_proton_exe_path(cfg: config.BnetConfig, proton_version: str) -> Path:
+    """Get the path to the Proton executable based on config and version."""
+    if cfg.proton_path is None:
+        click.secho("No Proton path configured; using default detection.", fg="yellow")
+        compat_dir = ensure_compat_dir(None)
+        return compat_dir / proton_version / "proton"
+    return cfg.proton_path / proton_version / "proton"
 
+def _get_wine_prefix(cfg: config.BnetConfig) -> Path:
+    """Get the Wine prefix path from config, or raise an error if not set."""
+    if cfg.wine_prefix is None:
+        raise click.ClickException("Wine prefix path is not configured. Please set 'wine_prefix' in your config file.")
+    return cfg.wine_prefix
 
 def _ensure_required_env(env: dict[str, str]) -> None:
+    """Ensure required environment variables for Proton are set."""
     required_env = ["WINEPREFIX", "STEAM_COMPAT_DATA_PATH", "STEAM_COMPAT_CLIENT_INSTALL_PATH"]
     missing_env = [k for k in required_env if not env.get(k)]
     if missing_env:
@@ -192,15 +222,16 @@ def _ensure_required_env(env: dict[str, str]) -> None:
 @click.option("--disable-browser/--enable-browser", default=True, help="Disable Battle.net embedded browser.")
 @click.option("--start-minimized/--normal", default=False, help="Start Battle.net minimized.")
 @click.option("--proton-version", default="GE-Proton10-32", help="Proton version to use")
-@click.option("--config-file", type=click.Path(exists=False), help="Optional path to config file")
+@click.option("--config-file", type=click.Path(exists=False),
+               default=CONFIG_FILE_PATH, help="Optional path to config file")
 def start(disable_browser: bool, start_minimized: bool, proton_version: str, config_file: Path | None):
     """Start the Battle.net launcher using the optionally specified Proton version."""
     cfg = config.load_config(config_file)
 
-    prefix = Path(cfg["wine_prefix"]).expanduser()
-    launcher_exe = Path(cfg["executable"]).expanduser()
+    prefix = _get_wine_prefix(cfg)
+    launcher_exe = cfg.executable
 
-    steam_path = detect_steam_base_path() or Path(cfg.get("steam_path", "~/.local/share/Steam")).expanduser()
+    steam_path = detect_steam_base_path() or Path(cfg.steam_path or "~/.local/share/Steam").expanduser()
     if not steam_path.exists():
         click.secho("Steam installation not detected; using default location for compatibility tools.", fg="yellow")
 
@@ -255,7 +286,10 @@ def start(disable_browser: bool, start_minimized: bool, proton_version: str, con
 def list_games(config_file: Path | None):
     """List Blizzard games installed in the configured Wine prefix drive_c."""
     cfg = config.load_config(config_file)
-    prefix = Path(cfg["wine_prefix"]).expanduser()
+    prefix = cfg.wine_prefix
+    if prefix is None:
+        click.secho("Wine prefix path is not configured. Please set 'wine_prefix' in your config file.", fg="red")
+        return
 
     games: dict[str, GameInfo] = find_installed_blizzard_games(prefix)
     if not games:
@@ -266,6 +300,30 @@ def list_games(config_file: Path | None):
     click.secho("Installed Blizzard games:", fg="green")
     for game_info in sorted(games.values(), key=lambda g: g.name):
         click.echo(f"- {game_info}")
+
+@cli.command()
+@click.option("--config-file", type=click.Path(), help="Optional path")
+@click.option("--auto-configure", "--ac", is_flag=True)
+def configure(config_file: Path | None, auto_configure: bool):
+    """Create or update configuration file with detected paths."""
+    path = Path(config_file) if config_file else config.CONFIG_FILE_PATH
+
+    if auto_configure:
+        click.secho("Running auto configuration...", fg="cyan")
+
+        cfg = config.generate_auto_config()
+        config.save_config(cfg, path)
+
+        click.secho(f"Config written to {path}", fg="green")
+        return
+
+    if not path.exists():
+        cfg = config.BnetConfig()
+        config.save_config(cfg, path)
+        click.secho(f"Default config created at {path}", fg="green")
+    else:
+        click.secho(f"Config already exists at {path}", fg="yellow")
+
 
 @cli.command()
 def doctor():

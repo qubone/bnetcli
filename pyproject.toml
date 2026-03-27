@@ -10,6 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
     "click>=8.3.1",
     "protonup>=0.1.5",
+    "pydantic>=2.12.5",
     "pyyaml>=6.0.3",
     "requests>=2.32.5",
     "types-pyyaml>=6.0.12.20250915",
@@ -18,6 +19,8 @@ dependencies = [
 
 [project.scripts]
 bnetcli = "bnetcli.cli:cli"
+bnet = "bnetcli.cli:cli"
+battlenet = "bnetcli.cli:cli"
 
 [project.optional-dependencies]
 lint = ["ruff"]
@@ -35,8 +38,6 @@ bnetcli = ["py.typed"]
 
 [tool.mypy]
 #strict=true
-#TODO: Investigate explicit_package_bases = true
-#TODO: Investigate packages = ["qsleeperfantasybot", "test"]
 ignore_missing_imports = true
 disallow_untyped_decorators = false
 
