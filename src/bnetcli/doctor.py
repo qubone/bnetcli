@@ -9,7 +9,7 @@ from pathlib import Path
 import click
 import yaml
 
-from .config import load_config
+from .config import BnetConfig, load_config
 from .environment import get_vulkan_icds
 from .paths import CONFIG_FILE_PATH
 from .proton import (
@@ -92,14 +92,14 @@ def _check_flatpak_steam(steam_path: Path | None):
             fg="yellow",
         )
 
-def _print_config(cfg: dict):
+def _print_config(cfg: BnetConfig):
     """Pretty-print loaded configuration."""
     logger.debug("Printing configuration")
 
     click.secho("Loaded configuration:", fg="cyan")
     try:
         formatted = yaml.safe_dump(
-            cfg,
+            cfg.model_dump(),
             default_flow_style=False,
             sort_keys=False,
         )
