@@ -4,6 +4,7 @@ import pytest
 from click.testing import CliRunner
 
 from bnetcli import cli
+from bnetcli.config import BnetConfig, EnvironmentConfig
 
 
 def test_install_dry_run(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -11,12 +12,13 @@ def test_install_dry_run(monkeypatch: pytest.MonkeyPatch) -> None:
 
     # Stub out system checks and other side effects
     monkeypatch.setattr("bnetcli.system.print_system_summary", lambda: None)
-    monkeypatch.setattr("bnetcli.config.load_config", lambda path=None: {
-        "proton_path": None,
-        "wine_prefix": "/tmp/prefix",
-        "installer_path": "/tmp/installer.exe",
-        "environment": {}
-    })
+    monkeypatch.setattr("bnetcli.config.load_config", lambda path=None:
+        BnetConfig(
+        proton_path=None,
+        wine_prefix=Path("/tmp/prefix"),
+        installer_path=Path("/tmp/installer.exe"),
+        environment=EnvironmentConfig()
+    ))
     monkeypatch.setattr("bnetcli.proton.ensure_compat_dir", lambda p: Path("/tmp/compat"))
     proton_path = Path("/tmp/compat/GE-Proton10-24/proton")
     monkeypatch.setattr(
@@ -36,7 +38,7 @@ def test_repair_prefix(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     runner: CliRunner = CliRunner()
     d = tmp_path / "prefix"
     d.mkdir()
-    monkeypatch.setattr("bnetcli.config.load_config", lambda path=None: {"wine_prefix": str(d)})
+    monkeypatch.setattr("bnetcli.config.load_config", lambda path=None: BnetConfig(wine_prefix=d))
 
     result = runner.invoke(cli.cli, ["repair-prefix"])
     assert result.exit_code == 0
@@ -52,11 +54,12 @@ def test_uninstall_removes_battle_net_data(monkeypatch: pytest.MonkeyPatch, tmp_
     proton_dir.mkdir(parents=True)
     (proton_dir / "GE-Proton10-24").mkdir(parents=True)
 
-    cfg = {
-        "wine_prefix": str(prefix),
-        "installer_path": str(installer_path),
-        "proton_path": str(proton_dir),
-    }
+    cfg = BnetConfig(
+        wine_prefix=prefix,
+        installer_path=installer_path,
+        proton_path=proton_dir,
+        environment=EnvironmentConfig(),
+    )
     monkeypatch.setattr("bnetcli.config.load_config", lambda p=None: cfg)
 
     result = runner.invoke(cli.cli, ["uninstall"], input="y\ny\n")
@@ -71,12 +74,12 @@ def test_uninstall_then_install_behaves_like_fresh(monkeypatch: pytest.MonkeyPat
     prefix = tmp_path / "prefix"
     installer_path = tmp_path / "Battle.net-Setup.exe"
     proton_dir = tmp_path / "compat"
-    cfg = {
-        "wine_prefix": str(prefix),
-        "installer_path": str(installer_path),
-        "proton_path": str(proton_dir),
-        "environment": {},
-    }
+    cfg = BnetConfig(
+        wine_prefix=prefix,
+        installer_path=installer_path,
+        proton_path=proton_dir,
+        environment=EnvironmentConfig(),
+    )
 
     monkeypatch.setattr("bnetcli.config.load_config", lambda p=None: cfg)
     monkeypatch.setattr("bnetcli.proton.ensure_compat_dir", lambda path: proton_dir)
@@ -104,11 +107,12 @@ def test_list_games_detects_installed_games(monkeypatch: pytest.MonkeyPatch, tmp
     (prefix / "drive_c" / "Program Files (x86)" / "World of Warcraft").mkdir(parents=True)
     (prefix / "drive_c" / "Program Files (x86)" / "Diablo IV").mkdir(parents=True)
 
-    cfg = {
-        "wine_prefix": str(prefix),
-        "executable": str(prefix / "drive_c" / "Program Files (x86)" / "Battle.net" / "Battle.net Launcher.exe"),
-        "proton_path": str(tmp_path / "compat"),
-    }
+    cfg = BnetConfig(
+        wine_prefix=prefix,
+        executable=prefix / "drive_c" / "Program Files (x86)" / "Battle.net" / "Battle.net Launcher.exe",
+        proton_path=tmp_path / "compat",
+        environment=EnvironmentConfig(),
+    )
     monkeypatch.setattr("bnetcli.config.load_config", lambda p=None: cfg)
 
     result = runner.invoke(cli.cli, ["list-games"])

@@ -7,9 +7,11 @@ from logging import getLogger
 from pathlib import Path
 
 import click
+import yaml
 
-from .config import load_config
+from .config import BnetConfig, load_config
 from .environment import get_vulkan_icds
+from .paths import CONFIG_FILE_PATH
 from .proton import (
     detect_latest_proton,
     detect_steam_base_path,
@@ -90,6 +92,21 @@ def _check_flatpak_steam(steam_path: Path | None):
             fg="yellow",
         )
 
+def _print_config(cfg: BnetConfig):
+    """Pretty-print loaded configuration."""
+    logger.debug("Printing configuration")
+
+    click.secho("Loaded configuration:", fg="cyan")
+    try:
+        formatted = yaml.safe_dump(
+            cfg.model_dump(),
+            default_flow_style=False,
+            sort_keys=False,
+        )
+        click.secho(formatted, fg="cyan")
+    except Exception as e:
+        click.secho(f"Failed to print config: {e}", fg="red")
+
 
 # ------------------------
 # Main Diagnostic Entry
@@ -145,11 +162,17 @@ def run_diagnostics():
     click.echo("=== bnetcli Advanced System Diagnostics ===\n")
 
     cfg = load_config()
+    click.echo("\n[Configuration]")
+
+    click.secho(f"Configuration file path: {CONFIG_FILE_PATH}\n", fg="cyan")
+
+    _print_config(cfg)
 
     # ---- Architecture ----
     click.echo(f"System architecture: {platform.machine()}")
 
     # ---- Steam Detection ----
+    click.echo("\n[Steam]")
     steam_path = detect_steam_base_path()
     if steam_path:
         click.secho(f"Steam detected at: {steam_path}", fg="green")
@@ -159,6 +182,7 @@ def run_diagnostics():
     _check_flatpak_steam(steam_path)
 
     compat_dir = ensure_compat_dir(None)
+    click.echo("\n[Proton]")
     click.echo(f"Compatibility tools directory: {compat_dir}")
 
     # ---- ProtonUp ----
@@ -178,7 +202,7 @@ def run_diagnostics():
 
     # ---- Wine Prefix ----
     click.echo("\n[Wine Prefix]")
-    prefix = Path(cfg["wine_prefix"]).expanduser()
+    prefix = Path(cfg.wine_prefix).expanduser()
     if prefix.exists():
         click.secho(f"Wine prefix exists: {prefix}", fg="green")
     else:
@@ -187,6 +211,7 @@ def run_diagnostics():
     # ---- Battle.net ----
     battlenet_exe = (
         prefix
+        / "pfx"
         / "drive_c"
         / "Program Files (x86)"
         / "Battle.net"

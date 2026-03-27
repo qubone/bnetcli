@@ -4,16 +4,19 @@ import pytest
 from click.testing import CliRunner
 
 from bnetcli import cli
+from bnetcli.config import BnetConfig, EnvironmentConfig
 
 
 def test_start_compat_dir_missing(monkeypatch: pytest.MonkeyPatch) -> None:
     runner: CliRunner = CliRunner()
     monkeypatch.setattr("bnetcli.utils.run", lambda *a, **k: None)
-    cfg = {
-        "wine_prefix": "/tmp/p",
-        "executable": "/tmp/e",
-        "proton_path": "/tmp/compat",
-    }
+    cfg = BnetConfig(
+        wine_prefix=Path("/tmp/p"),
+        executable=Path("/tmp/e"),
+        steam_path=Path("/tmp/steam"),
+        proton_path=Path("/tmp/compat"),
+        environment=EnvironmentConfig(),
+    )
     monkeypatch.setattr("bnetcli.config.load_config", lambda p=None: cfg)
     # make ensure_compat_dir return a path that does not exist
     # cli imported ensure_compat_dir directly; patch the symbol in cli module
@@ -27,11 +30,13 @@ def test_start_compat_dir_missing(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_start_proton_executable_missing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     runner: CliRunner = CliRunner()
     monkeypatch.setattr("bnetcli.utils.run", lambda *a, **k: None)
-    cfg = {
-        "wine_prefix": str(tmp_path / "p"),
-        "executable": str(tmp_path / "e"),
-        "proton_path": str(tmp_path / "compat"),
-    }
+    cfg = BnetConfig(
+        wine_prefix=tmp_path / "p",
+        executable=tmp_path / "e",
+        steam_path=tmp_path / "steam",
+        proton_path=tmp_path / "compat",
+        environment=EnvironmentConfig(),
+    )
     monkeypatch.setattr("bnetcli.config.load_config", lambda p=None: cfg)
     # patch symbols imported into cli at module load time
     monkeypatch.setattr("bnetcli.cli.detect_steam_base_path", lambda: tmp_path / "steam")
@@ -66,12 +71,13 @@ def test_start_expands_paths_and_sets_env(monkeypatch: pytest.MonkeyPatch, tmp_p
     proton_exe_path.write_text("#!/bin/sh\nexit 0")
     proton_exe_path.chmod(0o755)
 
-    cfg = {
-        "wine_prefix": "~/Games/battlenet/pfx",
-        "executable": "~/Games/battlenet/pfx/drive_c/Program Files (x86)/Battle.net/Battle.net Launcher.exe",
-        "proton_path": str(proton_path),
-        "steam_path": "~/.local/share/Steam",
-    }
+    cfg = BnetConfig(
+        wine_prefix=Path.home() / "Games/battlenet/pfx",
+        executable=Path.home() / "Games/battlenet/pfx/drive_c/Program Files (x86)/Battle.net/Battle.net Launcher.exe",
+        proton_path=proton_path,
+        steam_path=Path.home() / ".local/share/Steam",
+        environment=EnvironmentConfig(),
+    )
     monkeypatch.setattr("bnetcli.config.load_config", lambda p=None: cfg)
     monkeypatch.setattr("bnetcli.cli.detect_steam_base_path", lambda: Path.home() / ".local/share/Steam")
     monkeypatch.setattr("bnetcli.cli.ensure_compat_dir", lambda p: proton_path)

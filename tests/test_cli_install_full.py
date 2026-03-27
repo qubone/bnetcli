@@ -4,6 +4,7 @@ import pytest
 from click.testing import CliRunner
 
 from bnetcli import cli
+from bnetcli.config import BnetConfig, EnvironmentConfig
 
 
 def test_install_non_dry_run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -12,23 +13,24 @@ def test_install_non_dry_run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
     # Stub out system checks and side effects
     monkeypatch.setattr("bnetcli.system.print_system_summary", lambda: None)
 
-    cfg = {
-        "proton_path": str(tmp_path / "compat"),
-        "wine_prefix": str(tmp_path / "prefix"),
-        "installer_path": str(tmp_path / "inst.exe"),
-        "environment": {},
-    }
+    cfg = BnetConfig(
+        proton_path=tmp_path / "compat",
+        wine_prefix=tmp_path / "prefix",
+        steam_path=tmp_path / "steam",
+        installer_path=tmp_path / "inst.exe",
+        environment=EnvironmentConfig(),
+    )
 
     monkeypatch.setattr("bnetcli.config.load_config", lambda path=None: cfg)
 
     # Ensure proton exe exists
-    proton_exe = Path(str(cfg["proton_path"])) / "GE-Proton10-24" / "proton"
+    proton_exe = Path(str(cfg.proton_path)) / "GE-Proton10-24" / "proton"
     proton_exe.parent.mkdir(parents=True)
     proton_exe.write_text("")
 
     monkeypatch.setattr(
         "bnetcli.proton.ensure_compat_dir",
-        lambda p: Path(str(cfg["proton_path"])),
+        lambda p: Path(str(cfg.proton_path)),
     )
     monkeypatch.setattr("bnetcli.proton.resolve_proton_version", lambda d, v: ("GE-Proton10-24", proton_exe))
 

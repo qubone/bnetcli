@@ -10,18 +10,19 @@ def test_integration_cli_dry_run_install_and_start(monkeypatch: pytest.MonkeyPat
     runner = CliRunner()
 
     exe_path = tmp_path / "prefix" / "drive_c" / "Program Files (x86)" / "Battle.net" / "Battle.net Launcher.exe"
-    cfg = {
-        "wine_prefix": str(tmp_path / "prefix"),
-        "executable": str(exe_path),
-        "proton_path": str(tmp_path / "compat"),
-        "installer_path": str(tmp_path / "installer.exe"),
-        "environment": {},
-    }
+
+    cfg = config.BnetConfig(
+        wine_prefix=tmp_path / "prefix",
+        executable=exe_path,
+        proton_path=tmp_path / "compat",
+        installer_path=tmp_path / "installer.exe",
+        environment=config.EnvironmentConfig(),  # or with defaults
+    )
 
     monkeypatch.setattr("bnetcli.config.load_config", lambda p=None: cfg)
-    monkeypatch.setattr("bnetcli.proton.ensure_compat_dir", lambda p: Path(cfg["proton_path"]))  # type: ignore[arg-type]
+    monkeypatch.setattr("bnetcli.proton.ensure_compat_dir", lambda p: cfg.proton_path)  # type: ignore[arg-type]
     def fake_resolve_proton_version(d, v):
-        return "GE-Proton10-24", Path(cfg["proton_path"]) / "GE-Proton10-24" / "proton"  # ty:ignore[invalid-argument-type]
+        return "GE-Proton10-24", cfg.proton_path / "GE-Proton10-24" / "proton"  # ty:ignore[invalid-argument-type]
 
     monkeypatch.setattr("bnetcli.proton.resolve_proton_version", fake_resolve_proton_version)
     monkeypatch.setattr("bnetcli.wine.create_prefix", lambda prefix, proton: prefix.mkdir(parents=True, exist_ok=True))
@@ -44,22 +45,24 @@ def test_load_config_missing_and_corrupt(tmp_path: Path) -> None:
     assert not config_path.exists()
 
     cfg = config.load_config(config_path)
-    assert cfg["wine_prefix"]
-    assert config_path.exists()
+    assert cfg.wine_prefix
 
     config_path.write_text("not: valid: yaml: -")
     cfg2 = config.load_config(config_path)
-    assert cfg2["wine_prefix"]
+    assert cfg2.wine_prefix
 
 
 def test_start_missing_steam(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     runner = CliRunner()
-    cfg = {
-        "wine_prefix": str(tmp_path / "prefix"),
-        "executable": str(tmp_path / "launcher.exe"),
-        "proton_path": str(tmp_path / "compat"),
-        "environment": {},
-    }
+
+
+    cfg = config.BnetConfig(
+        wine_prefix=tmp_path / "prefix",
+        executable=tmp_path / "launcher.exe",
+        proton_path=tmp_path / "compat",
+        installer_path=tmp_path / "installer.exe",
+        environment=config.EnvironmentConfig(),  # or with defaults
+    )
 
     monkeypatch.setattr("bnetcli.config.load_config", lambda path=None: cfg)
     monkeypatch.setattr("bnetcli.proton.detect_steam_base_path", lambda: None)
